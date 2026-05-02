@@ -175,3 +175,6 @@ files
 startupbackend.sh
 startupfrontend.sh
 /backend/local_model
+
+# Neo4j data
+/neo4j/
