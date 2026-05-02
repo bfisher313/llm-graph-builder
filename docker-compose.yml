@@ -3,7 +3,7 @@ version: "3"
 services:
   neo4j:
     image: neo4j:5.26.0-enterprise
-    container_name: neo4j
+    container_name: neo4j-llm-graph-builder
     ports:
       - "7474:7474"
       - "7687:7687"

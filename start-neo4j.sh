@@ -8,7 +8,7 @@
 #   ./start-neo4j.sh status   # check if running
 # ============================================================
 
-CONTAINER_NAME="neo4j-standalone"
+CONTAINER_NAME="neo4j-llm-graph-builder"
 NEO4J_IMAGE="neo4j:5.26.0-enterprise"
 NEO4J_PASSWORD="llmgraphbuilder"
 DATA_DIR="./neo4j/data"
