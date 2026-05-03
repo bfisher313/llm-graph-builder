@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   neo4j:
     image: neo4j:5.26.0-enterprise
@@ -74,7 +72,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_BACKEND_API_URL=${VITE_BACKEND_API_URL-http://localhost:8000}
-        - VITE_REACT_APP_SOURCES=${VITE_REACT_APP_SOURCES-local,wiki,s3}
+        - VITE_REACT_APP_SOURCES=${VITE_REACT_APP_SOURCES-local,youtube,wiki,s3,web}
         - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID-}
         - VITE_BLOOM_URL=${VITE_BLOOM_URL-https://workspace-preview.neo4j.io/workspace/explore?connectURL={CONNECT_URL}&search=Show+me+a+graph&featureGenAISuggestions=true&featureGenAISuggestionsInternal=true}
         - VITE_TIME_PER_PAGE=${VITE_TIME_PER_PAGE-50}
@@ -83,8 +81,8 @@ services:
         - VITE_ENV=${VITE_ENV-DEV}
         - VITE_CHAT_MODES=${VITE_CHAT_MODES-}
         - VITE_BATCH_SIZE=${VITE_BATCH_SIZE-2}
-        - VITE_LLM_MODELS=${VITE_LLM_MODELS-}
-        - VITE_LLM_MODELS_PROD=${VITE_LLM_MODELS_PROD-gemini_2.5_flash,openai_gpt_5_mini,diffbot,anthropic_claude_4.5_haiku}
+        - VITE_LLM_MODELS=${VITE_LLM_MODELS-glm_5_1}
+        - VITE_LLM_MODELS_PROD=${VITE_LLM_MODELS_PROD-glm_5_1}
         - VITE_AUTH0_DOMAIN=${VITE_AUTH0_DOMAIN-}
         - VITE_AUTH0_CLIENT_ID=${VITE_AUTH0_CLIENT_ID-}
         - VITE_SKIP_AUTH=${VITE_SKIP_AUTH-true}
