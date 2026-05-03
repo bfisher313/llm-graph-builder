@@ -226,7 +226,14 @@ async def get_graph_document_list(
         if isinstance(llm,DiffbotGraphTransformer):
             graph_document_list = llm_transformer.convert_to_graph_documents(combined_chunk_document_list)
         else:
-            graph_document_list = await llm_transformer.aconvert_to_graph_documents(combined_chunk_document_list)
+            llm_concurrency = int(get_value_from_env("LLM_CONCURRENCY", "8"))
+            logging.info(f"Processing {len(combined_chunk_document_list)} chunks with LLM concurrency of {llm_concurrency}")
+            graph_document_list = []
+            for i in range(0, len(combined_chunk_document_list), llm_concurrency):
+                batch = combined_chunk_document_list[i:i + llm_concurrency]
+                logging.info(f"Processing LLM batch {i // llm_concurrency + 1} ({len(batch)} chunks)")
+                batch_results = await llm_transformer.aconvert_to_graph_documents(batch)
+                graph_document_list.extend(batch_results)
     except Exception as e:
        logging.error(f"Error in graph transformation: {e}", exc_info=True)
        raise LLMGraphBuilderException(f"Graph transformation failed: {str(e)}")
