@@ -363,8 +363,9 @@ async def post_processing(credentials: Neo4jCredentials = Depends(get_neo4j_cred
             
         if "enable_communities" in tasks:
             api_name = 'create_communities'
-            await asyncio.to_thread(create_communities, credentials.uri, credentials.userName, credentials.password, credentials.database, credentials.email, embedding_provider, embedding_model)
-            logging.info(f'created communities') 
+            community_model = get_value_from_env("GRAPH_CLEANUP_MODEL", "openai_gpt_5_mini")
+            await asyncio.to_thread(create_communities, credentials.uri, credentials.userName, credentials.password, credentials.database, credentials.email, community_model, embedding_provider, embedding_model)
+            logging.info(f'created communities')
 
         graphDb_data_Access = graphDBdataAccess(graph)
         document_name = ""

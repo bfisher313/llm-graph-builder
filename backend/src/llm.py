@@ -1,5 +1,6 @@
 import logging
 from langchain_core.documents import Document
+import asyncio
 import os
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_google_vertexai import ChatVertexAI
@@ -123,13 +124,16 @@ def get_llm(model: str):
             )
             callback_handler = None
         
-        else: 
+        else:
             model_name, api_endpoint, api_key = env_value.split(",")
             llm = ChatOpenAI(
                 api_key=api_key,
                 base_url=api_endpoint,
                 model=model_name,
                 temperature=0,
+                max_tokens=16384,
+                max_retries=3,
+                timeout=120,
                 callbacks=callback_manager,
             )
     except Exception as e:
@@ -229,10 +233,24 @@ async def get_graph_document_list(
             llm_concurrency = int(get_value_from_env("LLM_CONCURRENCY", "8"))
             logging.info(f"Processing {len(combined_chunk_document_list)} chunks with LLM concurrency of {llm_concurrency}")
             graph_document_list = []
+            max_batch_retries = int(get_value_from_env("LLM_BATCH_RETRIES", "3"))
             for i in range(0, len(combined_chunk_document_list), llm_concurrency):
                 batch = combined_chunk_document_list[i:i + llm_concurrency]
-                logging.info(f"Processing LLM batch {i // llm_concurrency + 1} ({len(batch)} chunks)")
-                batch_results = await llm_transformer.aconvert_to_graph_documents(batch)
+                batch_num = i // llm_concurrency + 1
+                logging.info(f"Processing LLM batch {batch_num} ({len(batch)} chunks)")
+                batch_results = None
+                for attempt in range(1, max_batch_retries + 1):
+                    try:
+                        batch_results = await llm_transformer.aconvert_to_graph_documents(batch)
+                        break
+                    except Exception as batch_err:
+                        if attempt < max_batch_retries:
+                            wait_time = attempt * 5
+                            logging.warning(f"Batch {batch_num} failed (attempt {attempt}/{max_batch_retries}): {batch_err}. Retrying in {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            logging.error(f"Batch {batch_num} failed after {max_batch_retries} attempts: {batch_err}")
+                            raise
                 graph_document_list.extend(batch_results)
     except Exception as e:
        logging.error(f"Error in graph transformation: {e}", exc_info=True)

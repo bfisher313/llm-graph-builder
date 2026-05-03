@@ -1160,7 +1160,7 @@ const FileTable: ForwardRefRenderFunction<ChildRef, FileTableProps> = (props, re
                           <span>
                             <InformationCircleIconOutline className='n-size-token-6' />
                           </span>
-                          {`Large files may be partially processed up to 10K characters due to resource limit.`}
+                          {`All chunks will be processed for each file.`}
                         </Flex>
                         {queueSize > 0 && (
                           <Flex

@@ -73,7 +73,6 @@ class CreateChunksofDocument:
 
         logging.info('Total chunks created: %d', len(chunks))
         if not is_neo4j_user and len(chunks) > chunk_to_be_created:
-            chunks = chunks[:chunk_to_be_created]
-            logging.info('Non Neo4j user - limiting chunks to %d from %d', chunk_to_be_created, len(chunks))
+            logging.info('Processing all %d chunks (chunk cap not applied for local deployment)', len(chunks))
 
         return chunks

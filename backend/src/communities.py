@@ -327,7 +327,8 @@ def create_community_summaries(gds, model, email, uri):
         community_chain = get_community_chain(llm)
         
         summaries = []
-        with ThreadPoolExecutor() as executor:
+        community_concurrency = int(get_value_from_env("LLM_CONCURRENCY", "2"))
+        with ThreadPoolExecutor(max_workers=community_concurrency) as executor:
             futures = [executor.submit(process_community_info, community, community_chain) for community in community_info_list.to_dict(orient="records")]
    
             for future in as_completed(futures):
@@ -343,7 +344,7 @@ def create_community_summaries(gds, model, email, uri):
         parent_community_chain = get_community_chain(llm, is_parent=True)
 
         parent_summaries = []
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=community_concurrency) as executor:
             futures = [executor.submit(process_community_info, community, parent_community_chain, is_parent=True) for community in parent_community_info.to_dict(orient="records")]
             
             for future in as_completed(futures):
