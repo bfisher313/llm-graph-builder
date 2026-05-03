@@ -57,7 +57,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT-}
     container_name: backend
-    command: ["gunicorn", "score:app", "--workers", "2", "--threads", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "300"]
+    command: ["gunicorn", "score:app", "--workers", "4", "--threads", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "300"]
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
