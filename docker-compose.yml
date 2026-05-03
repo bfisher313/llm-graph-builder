@@ -33,6 +33,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend:/code
+      - local_model:/code/local_model
       - ~/.config/gcloud:/root/.config/gcloud:ro
     env_file:
       - ./backend/.env
@@ -99,6 +100,9 @@ services:
       - "8080:8080"
     networks:
       - net
+
+volumes:
+  local_model:
 
 networks:
   net:
