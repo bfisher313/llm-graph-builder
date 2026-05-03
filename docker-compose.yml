@@ -12,15 +12,24 @@ services:
       - NEO4J_AUTH=neo4j/llmgraphbuilder
       - NEO4J_PLUGINS=["apoc","graph-data-science"]
       - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=256M
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/import:/var/lib/neo4j/import
     networks:
       - net
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p llmgraphbuilder 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
   backend:
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     build:
       context: ./backend
       dockerfile: Dockerfile
