@@ -8,7 +8,44 @@ Transform unstructured data (PDFs, DOCs, TXTs, YouTube videos, web pages, etc.) 
 
 This application allows you to upload files from various sources (local machine, GCS, S3 bucket, or web sources), choose your preferred LLM model, and generate a Knowledge Graph.
 
-## Getting Started
+## Quick Start (Docker Compose)
+
+This is a fork configured for local deployment using GLM-5.1 via ZAI, with a self-contained Neo4j Enterprise instance.
+
+### **1. Configure**
+```bash
+cp backend/example.env.local backend/.env
+```
+Then edit `backend/.env` and replace `YOUR_ZAI_API_KEY` with your ZAI API key.
+
+### **2. Launch**
+```bash
+docker compose up
+```
+
+### **3. Access**
+
+| Service | URL | Notes |
+|---------|-----|-------|
+| App UI | http://localhost:8080 | Upload files, generate graphs, chat |
+| Backend API | http://localhost:8000 | FastAPI backend |
+| Neo4j Browser | http://localhost:7474 | Query and explore the graph directly |
+| Login: `neo4j` / `llmgraphbuilder` | | |
+
+### **4. (Optional) Standalone Neo4j**
+If you want to run Neo4j outside of docker-compose:
+```bash
+./start-neo4j.sh          # start
+./start-neo4j.sh stop     # stop
+./start-neo4j.sh status   # check status
+```
+
+### **Changing the target database**
+The default database is `the-black-book-of-power`. To process a different source, edit `NEO4J_DATABASE` in `backend/.env` and restart. Neo4j Enterprise supports multiple databases within the same instance, so each book or data source gets its own isolated graph.
+
+---
+
+## Getting Started (Original Upstream Docs)
 
 ### **Prerequisites**
 - **Python 3.12 or higher** (for local/separate backend deployment)
