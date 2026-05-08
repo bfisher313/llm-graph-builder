@@ -12,6 +12,8 @@ This application allows you to upload files from various sources (local machine,
 
 This is a fork configured for local deployment using GLM-5.1 via ZAI, with a self-contained Neo4j Enterprise instance.
 
+**📋 Quick Start Summary:** Configure → Launch → Setup Database → Ready to use
+
 ### **1. Configure**
 ```bash
 cp backend/example.env.local backend/.env
@@ -20,8 +22,20 @@ Then edit `backend/.env` and replace `YOUR_ZAI_API_KEY` with your ZAI API key.
 
 ### **2. Launch**
 ```bash
-docker compose up
+docker compose up -d
 ```
+
+### **2.5. Setup Database (Required)**
+After the containers start, you MUST run the database setup script to create the custom database and grant necessary write privileges:
+```bash
+./setup-database.sh
+```
+
+This script handles:
+- Creating the `theblackbookofpower` database
+- Granting write privileges to the admin user (required for the application's permission system)
+
+**⚠️ Important:** Without running this script, the application will run in read-only mode and won't be able to create graphs.
 
 ### **3. Access**
 
@@ -40,8 +54,64 @@ If you want to run Neo4j outside of docker-compose:
 ./start-neo4j.sh status   # check status
 ```
 
+### **Troubleshooting Database Issues**
+
+If you encounter database connection errors, check the following:
+
+1. **Database doesn't exist or read-only mode:** This usually means the setup script wasn't run. Run:
+   ```bash
+   ./setup-database.sh
+   ```
+
+2. **Wrong database name in .env:** Ensure `NEO4J_DATABASE` in `backend/.env` matches an existing database. Available databases can be listed with:
+   ```bash
+   docker exec neo4j-llm-graph-builder cypher-shell -u neo4j -p llmgraphbuilder "SHOW DATABASES"
+   ```
+
+3. **Restart services after .env changes:** If you modify database configuration, you must recreate the backend container (not just restart):
+   ```bash
+   docker compose down backend
+   docker compose up -d backend
+   ```
+
+4. **Backend not picking up .env changes:** Docker Compose doesn't reload environment files on restart. Use `docker compose down` and `docker compose up -d` to rebuild containers with new configuration.
+
+5. **Check write privileges:** If the backend shows read-only access after running the setup script, verify privileges:
+   ```bash
+   docker exec neo4j-llm-graph-builder cypher-shell -u neo4j -p llmgraphbuilder "SHOW USER PRIVILEGES YIELD action, graph WHERE graph = 'theblackbookofpower' AND action = 'write'"
+   ```
+   If no privileges are shown, run the setup script again.
+
+### **Future Enhancement: Automatic Setup**
+
+**Note:** The database setup currently requires manual execution of the setup script. A future enhancement would be to implement backend self-healing logic that automatically creates the database and grants privileges if they don't exist. This would provide a truly zero-configuration "pushbutton" deployment experience.
+
+**Planned Implementation:**
+- Backend startup check for database existence
+- Automatic database creation via Neo4j admin APIs
+- Self-granting of necessary write privileges
+- Graceful fallback to manual setup if automation fails
+
+This enhancement would eliminate the need for the `setup-database.sh` script and make the deployment process fully automated.
+
 ### **Changing the target database**
-The default database is `the-black-book-of-power`. To process a different source, edit `NEO4J_DATABASE` in `backend/.env` and restart. Neo4j Enterprise supports multiple databases within the same instance, so each book or data source gets its own isolated graph.
+The default database is `theblackbookofpower`. To process a different source:
+
+1. Edit `NEO4J_DATABASE` in `backend/.env` with your desired database name
+2. Recreate the backend: `docker compose down backend && docker compose up -d backend`
+3. Create and configure the new database:
+   ```bash
+   # Replace 'yourdbname' with your desired database name
+   docker exec neo4j-llm-graph-builder cypher-shell -u neo4j -p llmgraphbuilder "CREATE DATABASE IF NOT EXISTS yourdbname WAIT"
+   docker exec neo4j-llm-graph-builder cypher-shell -u neo4j -p llmgraphbuilder "GRANT WRITE ON GRAPH yourdbname TO admin"
+   ```
+
+Neo4j Enterprise supports multiple databases within the same instance, so each book or data source gets its own isolated graph.
+
+**Important Notes:**
+- Neo4j database names cannot contain hyphens. Use only alphanumeric characters, underscores, and dots
+- Each new database requires explicit write privilege grants for the admin user
+- The backend must be restarted after changing `NEO4J_DATABASE` to pick up the new configuration
 
 ---
 
@@ -294,7 +364,8 @@ gcloud run deploy dev-backend \
 | GCP_LOG_METRICS_ENABLED| Optional           | False         | Flag to enable Google Cloud logs                                                                 |
 | NEO4J_URI              | Optional           | neo4j://database:7687 | URI for Neo4j database                                                                  |
 | NEO4J_USERNAME         | Optional           | neo4j         | Username for Neo4j database                                                                      |
-| NEO4J_PASSWORD         | Optional           | password      | Password for Neo4j database                                                                      |                                               |
+| NEO4J_PASSWORD         | Optional           | password      | Password for Neo4j database                                                                      |
+| NEO4J_DATABASE         | Optional           | theblackbookofpower | Name of the Neo4j database to use. Note: Neo4j database names cannot contain hyphens or special characters beyond alphanumerics, underscores, and dots.  |
 | GCS_FILE_CACHE         | Optional           | False         | If set to True, will save files to process into GCS. If False, will save files locally           |                   |
 | ENTITY_EMBEDDING       | Optional           | False         | If set to True, it will add embeddings for each entity in the database                           |
 | LLM_MODEL_CONFIG_ollama_<model_name> | Optional |           | Set ollama config as model_name,model_local_url for local deployments                            |
