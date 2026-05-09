@@ -179,3 +179,6 @@ startupfrontend.sh
 
 # Neo4j data
 /neo4j/
+
+# Graph backups and exports (stored in Google Drive instead)
+/backups/

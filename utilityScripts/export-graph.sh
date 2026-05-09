@@ -1,6 +1,6 @@
 #!/bin/bash
-# Neo4j Knowledge Graph Export Script (Cypher Format)
-# Exports graph data as Cypher statements for portability
+# Neo4j Knowledge Graph Export Script (Simple Cypher Format)
+# Exports graph data using basic Cypher queries
 # This is NON-DESTRUCTIVE and safe to run anytime
 
 set -e  # Exit on error
@@ -51,7 +51,7 @@ done
 
 # Show help
 if [ "$HELP" = true ]; then
-    echo "Neo4j Knowledge Graph Export Script (Cypher Format)"
+    echo "Neo4j Knowledge Graph Export Script (Simple Cypher Format)"
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
@@ -67,11 +67,11 @@ if [ "$HELP" = true ]; then
     echo "  $0 --database-name mygraph --export-dir /exports  # Custom both"
     echo ""
     echo "Notes:"
-    echo "  - This exports data as Cypher statements (portable, human-readable)"
+    echo "  - This exports data using basic Cypher queries (portable, human-readable)"
     echo "  - Export is non-destructive - source data is never modified"
     echo "  - Export runs while database is online (no downtime)"
     echo "  - Exported files can be imported into any Neo4j instance"
-    echo "  - Ideal for version control or partial restores"
+    echo "  - Uses direct Neo4j output format, no APOC required"
     exit 0
 fi
 
@@ -118,72 +118,50 @@ fi
 
 # Build Cypher query based on labels
 if [ -n "$LABELS" ]; then
-    # Convert comma-separated labels to array
+    # Export specific labels
+    LABEL_FILTER=""
     IFS=',' read -ra LABEL_ARRAY <<< "$LABELS"
-    LABEL_FILTER="WHERE "
     FIRST=true
     for label in "${LABEL_ARRAY[@]}"; do
+        label=$(echo "$label" | xargs) # Trim whitespace
         if [ "$FIRST" = false ]; then
             LABEL_FILTER+=" OR "
         fi
-        LABEL_FILTER+="'$label' IN labels(n)"
+        LABEL_FILTER+="\"\$label\" IN labels(n)"
         FIRST=false
     done
+    NODE_QUERY="MATCH (n) WHERE $LABEL_FILTER RETURN n"
+    REL_QUERY="MATCH (a)-[r]->(b) WHERE any(label IN labels(a) WHERE \"\$label\" IN [\"${LABELS//,/\",\"}\"]) OR any(label IN labels(b) WHERE \"\$label\" IN [\"${LABELS//,/\",\"}\"])) RETURN r"
 else
-    LABEL_FILTER=""
+    # Export all data
+    NODE_QUERY="MATCH (n) RETURN n"
+    REL_QUERY="MATCH (a)-[r]->(b) RETURN r"
 fi
 
 # Export nodes
 echo -e "${YELLOW}Exporting nodes...${NC}"
 NODE_FILE="$EXPORT_PATH/nodes.cypher"
+echo "// Neo4j Node Export - $(date)" > "$NODE_FILE"
+echo "" >> "$NODE_FILE"
 
-docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" --format plain "CALL apoc.export.cypher.all('${NODE_FILE}', {useOptimizations: {type: 'UNWIND_BATCH'}, batchSize: 100}) YIELD file, source, format, nodes, relationships, properties, time RETURN *" 2>/dev/null || {
-    # Fallback: Manual export if APOC export fails
-    echo -e "${YELLOW}⚠ APOC export not available, using manual export...${NC}"
+# Export nodes using basic Cypher
+docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" --format plain "$NODE_QUERY" 2>/dev/null | grep -v "^n$" | grep -v "^$" >> "$NODE_FILE" || true
 
-    # Get all node labels
-    if [ -n "$LABELS" ]; then
-        NODE_LABELS="$LABELS"
-    else
-        NODE_LABELS=$(docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" "CALL db.labels() YIELD label RETURN label" 2>/dev/null | grep -v "^label$" | tr '\n' ',' | sed 's/,$//')
-    fi
-
-    echo "// Node exports - $(date)" > "$NODE_FILE"
-    echo "" >> "$NODE_FILE"
-
-    IFS=',' read -ra EXPORT_LABELS <<< "$NODE_LABELS"
-    for label in "${EXPORT_LABELS[@]}"; do
-        label=$(echo "$label" | xargs) # Trim whitespace
-        if [ -n "$label" ]; then
-            echo "Exporting nodes with label: $label"
-            docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" --format plain "MATCH (n:$label) RETURN apoc.create.vNode([labels(n)[0]], properties(n)) AS node" 2>/dev/null >> "$NODE_FILE" || true
-        fi
-    done
-}
-
-echo -e "${GREEN}✓ Nodes exported${NC}"
+NODE_EXPORT_COUNT=$(wc -l < "$NODE_FILE" 2>/dev/null || echo "0")
+echo -e "${GREEN}✓ Nodes exported ($NODE_EXPORT_COUNT lines)${NC}"
 echo ""
 
 # Export relationships
 echo -e "${YELLOW}Exporting relationships...${NC}"
 REL_FILE="$EXPORT_PATH/relationships.cypher"
-
-echo "// Relationship exports - $(date)" > "$REL_FILE"
+echo "// Neo4j Relationship Export - $(date)" > "$REL_FILE"
 echo "" >> "$REL_FILE"
 
-# Get all relationship types
-REL_TYPES=$(docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" "CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType" 2>/dev/null | grep -v "^relationshipType$" | tr '\n' ',' | sed 's/,$//')
+# Export relationships using basic Cypher
+docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" --format plain "$REL_QUERY" 2>/dev/null | grep -v "^r$" | grep -v "^$" >> "$REL_FILE" || true
 
-IFS=',' read -ra EXPORT_RELS <<< "$REL_TYPES"
-for rel_type in "${EXPORT_RELS[@]}"; do
-    rel_type=$(echo "$rel_type" | xargs) # Trim whitespace
-    if [ -n "$rel_type" ]; then
-        echo "Exporting relationships: $rel_type"
-        docker exec "$CONTAINER_NAME" cypher-shell -u neo4j -p llmgraphbuilder -d "$DATABASE_NAME" --format plain "MATCH (a)-[r:$rel_type]->(b) RETURN apoc.create.vRelationship(a, type(r), properties(r), b) AS rel" 2>/dev/null >> "$REL_FILE" || true
-    fi
-done
-
-echo -e "${GREEN}✓ Relationships exported${NC}"
+REL_EXPORT_COUNT=$(wc -l < "$REL_FILE" 2>/dev/null || echo "0")
+echo -e "${GREEN}✓ Relationships exported ($REL_EXPORT_COUNT lines)${NC}"
 echo ""
 
 # Combine into single export file
@@ -226,7 +204,8 @@ cat > "$MANIFEST_FILE" << EOF
     "export_path": "$EXPORT_PATH",
     "export_file": "$COMBINED_FILE",
     "labels_filtered": "${LABELS:-none}",
-    "container_name": "$CONTAINER_NAME"
+    "container_name": "$CONTAINER_NAME",
+    "export_method": "direct_cypher"
 }
 EOF
 echo -e "${GREEN}✓ Manifest created${NC}"
@@ -247,6 +226,8 @@ echo -e "  Size: ${BLUE}$EXPORT_SIZE${NC}"
 echo -e "  Database: ${BLUE}$DATABASE_NAME${NC}"
 echo -e "  Nodes exported: ${GREEN}$NODE_COUNT${NC}"
 echo -e "  Relationships exported: ${GREEN}$REL_COUNT${NC}"
+echo -e "  Node file lines: ${GREEN}$NODE_EXPORT_COUNT${NC}"
+echo -e "  Relationship file lines: ${GREEN}$REL_EXPORT_COUNT${NC}"
 echo ""
 echo -e "${YELLOW}To import this export, run:${NC}"
 echo -e "  ${BLUE}./utilityScripts/import-graph.sh --export-dir $EXPORT_PATH --database-name $DATABASE_NAME${NC}"
